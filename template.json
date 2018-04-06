@@ -1,0 +1,651 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "namePrefix": {
+            "type": "string",
+            "metadata": {
+                "description": "String used as a base for naming resources (6 alphanumeric characters or less).  A unique hash is prepended to the string for some resources, while resource-specific information is appended."
+            },
+            "maxLength": 6
+        },
+        "authType": {
+            "type": "string",
+            "allowedValues": [
+                "password",
+                "sshPublicKey"
+            ],
+            "metadata": {
+                "description": "Authorization type for SSH access to VMs"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "azureuser",
+            "metadata": {
+                "description": "Administrator username of each deployed VM (alphanumeric characters only)"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Administrator password for each deployed VM"
+            }
+        },
+        "adminSSHKey": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "SSH RSA public key file as a string"
+            }
+        },
+        "restrictAccess": {
+            "type": "int",
+            "defaultValue": 0,
+            "metadata": {
+                "description": "If 1, use specified IP address/subnet to restrict access to all endpoints.  If 0, access is open to any IP address."
+            }
+        },
+        "ipAddressOrSubnet": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "If restrictAccess is set to 1, specify an individual IP address or IP subnet/address range here from where access to all endpoints will be allowed."
+            }
+        },
+        "numMembershipNodes": {
+            "type": "int",
+            "defaultValue": 1,
+            "metadata": {
+                "description": "Number of membership services nodes."
+            },
+            "minValue": 1,
+            "maxValue": 1
+        },
+        "mnStorageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ],
+            "metadata": {
+                "description": "Storage performance level for Membership nodes"
+            }
+        },
+        "mnNodeVMSize": {
+            "type": "string",
+            "defaultValue": "Standard_D1_v2",
+            "allowedValues": [],
+            "metadata": {
+                "description": "Size of the virtual machine used for Membership nodes"
+            }
+        },
+        "numOrdererNodes": {
+            "type": "int",
+            "defaultValue": 1,
+            "metadata": {
+                "description": "Number of orderer nodes."
+            },
+            "minValue": 1,
+            "maxValue": 1
+        },
+        "onStorageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ],
+            "metadata": {
+                "description": "Storage performance level for Membership nodes"
+            }
+        },
+        "onNodeVMSize": {
+            "type": "string",
+            "defaultValue": "Standard_D1_v2",
+            "allowedValues": [],
+            "metadata": {
+                "description": "Size of the virtual machine used for Membership nodes"
+            }
+        },
+        "numPeerNodes": {
+            "type": "int",
+            "defaultValue": 2,
+            "metadata": {
+                "description": "Number of peers."
+            },
+            "minValue": 2,
+            "maxValue": 9
+        },
+        "pnStorageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Premium_LRS"
+            ],
+            "metadata": {
+                "description": "Storage performance level for Membership nodes"
+            }
+        },
+        "pnNodeVMSize": {
+            "type": "string",
+            "defaultValue": "Standard_D1_v2",
+            "allowedValues": [],
+            "metadata": {
+                "description": "Size of the virtual machine used for Membership nodes"
+            }
+        },
+        "CAUsername": {
+            "type": "string",
+            "defaultValue": "caadmin",
+            "metadata": {
+                "description": "Bootstrap user name for the Fabric CA"
+            }
+        },
+        "CAPassword": {
+            "type": "securestring",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Bootstrap user password for the fabric CA"
+            }
+        },
+        "location": {
+            "type": "string"
+        },
+        "baseUrl": {
+            "type": "string",
+            "metadata": {
+                "description": "The base URL for dependent assets",
+                "artifactsBaseUrl": ""
+            },
+            "defaultValue": "https://raw.githubusercontent.com/fabienpe/azure-hyperledger-artifacts/master"
+        }
+    },
+    "variables": {
+        "apiVersionDeployments": "2016-09-01",
+        "apiVersionPublicIPAddresses": "2016-09-01",
+        "apiVersionAvailabilitySets": "2017-03-30",
+        "apiVersionNetworkSecurityGroups": "2016-09-01",
+        "apiVersionNetworkInterfaces": "2016-09-01",
+        "apiVersionVirtualMachines": "2017-03-30",
+        "apiVersionVirtualNetworks": "2016-09-01",
+        "namingInfix": "[toLower(substring(concat(parameters('namePrefix'), uniqueString(resourceGroup().id)), 0, 9))]",
+        "availabilitySetName": "[concat(variables('namingInfix'), 'fabricAvSet')]",
+        "dnsName": "[variables('namingInfix')]",
+        "publicIPAddressName": "[concat(variables('dnsName'), '-publicip')]",
+        "loadBalancerName": "[concat(variables('namingInfix'), '-LB')]",
+        "loadBalancerBackendAddressPoolName": "LBBackendPool",
+        "loadBalancerInboundNatRuleNamePrefix": "NAT",
+        "httpPort": 80,
+        "sshPort": 22,
+        "sshStartingPort": 3000,
+        "adminSitePort": 3000,
+        "caVMNamePrefix": "[concat(variables('namingInfix'), '-ca')]",
+        "ordererVMNamePrefix": "[concat(variables('namingInfix'), '-orderer')]",
+        "peerVMNamePrefix": "[concat(variables('namingInfix'), '-peer')]",
+        "caNICPrefix": "nic-ca",
+        "ordererNICPrefix": "nic-orderer",
+        "peerNICPrefix": "nic-peer",
+        "subnetName": "[uniqueString(concat(resourceGroup().id, concat(variables('namingInfix'), 'subnet')))]",
+        "subnetPrefix": "10.0.0.0/24",
+        "nsgName": "[concat(variables('namingInfix'), 'nsg')]",
+        "sourceAddressPrefixArray": [
+            "*",
+            "[parameters('ipAddressOrSubnet')]"
+        ],
+        "sourceAddressPrefix": "[variables('sourceAddressPrefixArray')[parameters('restrictAccess')]]",
+        "subnetPropertiesArray": [
+            {
+                "name": "[variables('subnetName')]",
+                "properties": {
+                    "addressPrefix": "[variables('subnetPrefix')]",
+                    "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+                    }
+                }
+            }
+        ],
+        "ubuntuImage": {
+            "publisher": "Canonical",
+            "offer": "UbuntuServer",
+            "sku": "16.04-LTS",
+            "version": "16.04.201801120"
+        },
+        "vNet": {
+            "name": "[concat(variables('namingInfix'), 'vnet')]",
+            "addressSpacePrefix": "10.0.0.0/20"
+        },
+        "vnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('vNet').name)]",
+        "subnetRef": "[concat(variables('vnetID'),'/subnets/', variables('subnetName'))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "[variables('apiVersionAvailabilitySets')]",
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformUpdateDomainCount": "2",
+                "platformFaultDomainCount": "2"
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionPublicIPAddresses')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('publicIPAddressName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('dnsName')]"
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionDeployments')]",
+            "name": "loadBalancerLinkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('publicIpAddressName'))]"
+            ],
+            "properties": {
+                "mode": "incremental",
+                "templateLink": {
+                    "uri": "[concat(parameters('baseUrl'), '/nested/loadBalancer.json')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "loadBalancerName": {
+                        "value": "[variables('loadBalancerName')]"
+                    },
+                    "dnsHostName": {
+                        "value": "[variables('namingInfix')]"
+                    },
+                    "loadBalancerBackendAddressPoolName": {
+                        "value": "[variables('loadBalancerBackendAddressPoolName')]"
+                    },
+                    "loadBalancerInboundNatRuleNamePrefix": {
+                        "value": "[variables('loadBalancerInboundNatRuleNamePrefix')]"
+                    },
+                    "frontendPort1": {
+                        "value": "[variables('httpPort')]"
+                    },
+                    "backendPort1": {
+                        "value": "[variables('adminSitePort')]"
+                    },
+                    "numInboundNATRules": {
+                        "value": "[add(add(parameters('numOrdererNodes'), parameters('numMembershipNodes')), parameters('numPeerNodes'))]"
+                    },
+                    "inboundNATRuleSSHStartingPort": {
+                        "value": "[variables('sshStartingPort')]"
+                    },
+                    "inboundNATRuleSSHBackendPort": {
+                        "value": "[variables('sshPort')]"
+                    },
+                    "publicIPAddressName": {
+                        "value": "[variables('publicIPAddressName')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionNetworkSecurityGroups')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('nsgName')]",
+            "location": "[parameters('location')]",
+            "tags": {
+                "displayName": "Network Security Group"
+            },
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "allow-ssh",
+                        "properties": {
+                            "description": "Allow SSH",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "[variables('sshPort')]",
+                            "sourceAddressPrefix": "[variables('sourceAddressPrefix')]",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionVirtualNetworks')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[variables('vNet').name]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('nsgName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('vNet').addressSpacePrefix]"
+                    ]
+                },
+                "subnets": "[variables('subnetPropertiesArray')]"
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionDeployments')]",
+            "name": "caVMLinkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', variables('vNet').name)]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "loadBalancerLinkedTemplate"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[concat(parameters('baseUrl'), '/nested/VMAuth', '-', parameters('authType'), '.json')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "apiVersionVirtualMachines": {
+                        "value": "[variables('apiVersionVirtualMachines')]"
+                    },
+                    "apiVersionNetworkInterfaces": {
+                        "value": "[variables('apiVersionNetworkInterfaces')]"
+                    },
+                    "storagePerformance": {
+                        "value": "[parameters('mnStorageAccountType')]"
+                    },
+                    "loadBalancerName": {
+                        "value": "[variables('loadBalancerName')]"
+                    },
+                    "loadBalancerBackendAddressPoolName": {
+                        "value": "[variables('loadBalancerBackendAddressPoolName')]"
+                    },
+                    "loadBalancerInboundNatRuleNamePrefix": {
+                        "value": "[variables('loadBalancerInboundNatRuleNamePrefix')]"
+                    },
+                    "subnetRef": {
+                        "value": "[variables('subnetRef')]"
+                    },
+                    "vmNamePrefix": {
+                        "value": "[variables('caVMNamePrefix')]"
+                    },
+                    "numVMs": {
+                        "value": "[parameters('numMembershipNodes')]"
+                    },
+                    "offset": {
+                        "value": 0
+                    },
+                    "nicPrefix": {
+                        "value": "[variables('caNICPrefix')]"
+                    },
+                    "availabilitySetName": {
+                        "value": "[variables('availabilitySetName')]"
+                    },
+                    "vmSize": {
+                        "value": "[parameters('mnNodeVMSize')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "adminSSHKey": {
+                        "value": "[parameters('adminSSHKey')]"
+                    },
+                    "ubuntuImage": {
+                        "value": "[variables('ubuntuImage')]"
+                    },
+                    "namingInfix": {
+                        "value": "[variables('namingInfix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionDeployments')]",
+            "name": "ordererVMLinkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', variables('vNet').name)]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "loadBalancerLinkedTemplate"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[concat(parameters('baseUrl'), '/nested/VMAuth', '-', parameters('authType'), '.json')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "apiVersionVirtualMachines": {
+                        "value": "[variables('apiVersionVirtualMachines')]"
+                    },
+                    "apiVersionNetworkInterfaces": {
+                        "value": "[variables('apiVersionNetworkInterfaces')]"
+                    },
+                    "storagePerformance": {
+                        "value": "[parameters('onStorageAccountType')]"
+                    },
+                    "loadBalancerName": {
+                        "value": "[variables('loadBalancerName')]"
+                    },
+                    "loadBalancerBackendAddressPoolName": {
+                        "value": "[variables('loadBalancerBackendAddressPoolName')]"
+                    },
+                    "loadBalancerInboundNatRuleNamePrefix": {
+                        "value": "[variables('loadBalancerInboundNatRuleNamePrefix')]"
+                    },
+                    "subnetRef": {
+                        "value": "[variables('subnetRef')]"
+                    },
+                    "vmNamePrefix": {
+                        "value": "[variables('ordererVMNamePrefix')]"
+                    },
+                    "numVMs": {
+                        "value": "[parameters('numOrdererNodes')]"
+                    },
+                    "offset": {
+                        "value": "[parameters('numMembershipNodes')]"
+                    },
+                    "nicPrefix": {
+                        "value": "[variables('ordererNICPrefix')]"
+                    },
+                    "availabilitySetName": {
+                        "value": "[variables('availabilitySetName')]"
+                    },
+                    "vmSize": {
+                        "value": "[parameters('onNodeVMSize')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "adminSSHKey": {
+                        "value": "[parameters('adminSSHKey')]"
+                    },
+                    "ubuntuImage": {
+                        "value": "[variables('ubuntuImage')]"
+                    },
+                    "namingInfix": {
+                        "value": "[variables('namingInfix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionDeployments')]",
+            "name": "peerVMLinkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', variables('vNet').name)]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "loadBalancerLinkedTemplate"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[concat(parameters('baseUrl'), '/nested/VMAuth-', parameters('authType'), '.json')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "apiVersionVirtualMachines": {
+                        "value": "[variables('apiVersionVirtualMachines')]"
+                    },
+                    "apiVersionNetworkInterfaces": {
+                        "value": "[variables('apiVersionNetworkInterfaces')]"
+                    },
+                    "storagePerformance": {
+                        "value": "[parameters('pnStorageAccountType')]"
+                    },
+                    "loadBalancerName": {
+                        "value": "[variables('loadBalancerName')]"
+                    },
+                    "loadBalancerBackendAddressPoolName": {
+                        "value": "[variables('loadBalancerBackendAddressPoolName')]"
+                    },
+                    "loadBalancerInboundNatRuleNamePrefix": {
+                        "value": "[variables('loadBalancerInboundNatRuleNamePrefix')]"
+                    },
+                    "subnetRef": {
+                        "value": "[variables('subnetRef')]"
+                    },
+                    "vmNamePrefix": {
+                        "value": "[variables('peerVMNamePrefix')]"
+                    },
+                    "numVMs": {
+                        "value": "[parameters('numPeerNodes')]"
+                    },
+                    "offset": {
+                        "value": "[add(parameters('numMembershipNodes'), parameters('numOrdererNodes'))]"
+                    },
+                    "nicPrefix": {
+                        "value": "[variables('peerNICPrefix')]"
+                    },
+                    "availabilitySetName": {
+                        "value": "[variables('availabilitySetName')]"
+                    },
+                    "vmSize": {
+                        "value": "[parameters('pnNodeVMSize')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "adminSSHKey": {
+                        "value": "[parameters('adminSSHKey')]"
+                    },
+                    "ubuntuImage": {
+                        "value": "[variables('ubuntuImage')]"
+                    },
+                    "namingInfix": {
+                        "value": "[variables('namingInfix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        },
+        {
+            "apiVersion": "[variables('apiVersionDeployments')]",
+            "name": "vmExtensionLinkedTemplate",
+            "type": "Microsoft.Resources/deployments",
+            "dependsOn": [
+                "caVMLinkedTemplate",
+                "ordererVMLinkedTemplate",
+                "peerVMLinkedTemplate"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[concat(parameters('baseUrl'), '/nested/VMExtension.json')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "caVMNamePrefix": {
+                        "value": "[variables('caVMNamePrefix')]"
+                    },
+                    "numMembershipNodes": {
+                        "value": "[parameters('numMembershipNodes')]"
+                    },
+                    "ordererVMNamePrefix": {
+                        "value": "[variables('ordererVMNamePrefix')]"
+                    },
+                    "numOrdererNodes": {
+                        "value": "[parameters('numOrdererNodes')]"
+                    },
+                    "peerVMNamePrefix": {
+                        "value": "[variables('peerVMNamePrefix')]"
+                    },
+                    "numPeerNodes": {
+                        "value": "[parameters('numPeerNodes')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminSitePort": {
+                        "value": "[variables('adminSitePort')]"
+                    },
+                    "artifactsLocationURL": {
+                        "value": "[parameters('baseUrl')]"
+                    },
+                    "CAUsername": {
+                        "value": "[parameters('CAUsername')]"
+                    },
+                    "CAPassword": {
+                        "value": "[parameters('CAPassword')]"
+                    },
+                    "namingInfix": {
+                        "value": "[variables('namingInfix')]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "api-endpoint": {
+            "type": "string",
+            "value": "[concat('http://', reference(variables('publicIPAddressName')).dnsSettings.fqdn)]"
+        },
+        "prefix": {
+            "type": "string",
+            "value": "[variables('namingInfix')]"
+        },
+        "ssh-to-first-vm": {
+            "type": "string",
+            "value": "[concat('ssh -p ', variables('sshStartingPort'), ' ', parameters('adminUsername'), '@', reference(variables('publicIPAddressName')).dnsSettings.fqdn)]"
+        }
+    }
+}

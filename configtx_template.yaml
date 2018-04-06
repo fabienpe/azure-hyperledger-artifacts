@@ -9,17 +9,17 @@
 ################################################################################
 Profiles:
 
-    SampleOrgGenesis:
+    ComposerOrdererGenesis:
         Orderer:
             <<: *OrdererDefaults
             Organizations:
                 - *OrdererOrg
         Consortiums:
-            SampleConsortium:
+            ComposerConsortium:
                 Organizations:
                     - *Org1
-    SampleOrgChannel:
-        Consortium: SampleConsortium
+    ComposerChannel:
+        Consortium: ComposerConsortium
         Application:
             <<: *ApplicationDefaults
             Organizations:
@@ -46,7 +46,7 @@ Organizations:
         ID: OrdererMSP
 
         # MSPDir is the filesystem path which contains the MSP configuration
-        MSPDir: crypto-config/ordererOrganizations/example.com/msp
+        MSPDir: crypto-config/ordererOrganizations/fabienpe.com/msp
 
         # AdminPrincipal dictates the type of principal used for an
         # organization's Admins policy. Today, only the values of Role.ADMIN and
@@ -57,13 +57,13 @@ Organizations:
     - &Org1
         # DefaultOrg defines the organization which is used in the sampleconfig
         # of the fabric.git development environment
-        Name: Org1MSP
+        Name: Org1
 
         # ID to load the MSP definition as
         ID: Org1MSP
 
         # MSPDir is the filesystem path which contains the MSP configuration
-        MSPDir: crypto-config/peerOrganizations/org1.example.com/msp
+        MSPDir: crypto-config/peerOrganizations/org1.fabienpe.com/msp
 
         # AdminPrincipal dictates the type of principal used for an
         # organization's Admins policy. Today, only the values of Role.ADMIN and
@@ -96,7 +96,7 @@ Orderer: &OrdererDefaults
         - {{PREFIX}}-orderer0:7050
 
     # Batch Timeout: The amount of time to wait before creating a batch
-    BatchTimeout: 1s
+    BatchTimeout: 2s
 
     # Batch Size: Controls the number of messages batched into a block
     BatchSize:

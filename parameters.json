@@ -1,0 +1,57 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "westeurope"
+        },
+        "namePrefix": {
+            "value": "mypref"
+        },
+        "authType": {
+            "value": "sshPublicKey"
+        },
+        "adminUsername": {
+            "value": "azureuser"
+        },
+        "adminSSHKey": {
+            "value": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQHC7Q1pK9uO4IGREoYmIH60j+I+C3ZTqf9pFvKEq8R3Oky5mPY3HZQ6Lno/VTrxL7YqHqpt6DSdaCKy/CUlnaf3agtUItpNj6Ro7lnGUoADUOWRuhJdgN1VmgZxGxrhB1j0b0WQK9PwOL9C2yBuwP6O5VeZU3FUDNODUe7g5VgpmWLNTINB9unr54cUVYXt19c+WA17iHQiWUfPHWCEdQz8wNblbtMRkZdEuWf19xy2QjkZpoS/cRYfy8E7WSYN45P0TigjkX1t/kkdblFOKyBU+1ONOm2/PTVx/yksf/hZtqEUz+B9ovEOdTslyf+12OxdFYucoTvwb31/00UoqT4+3rwZnzkQPA4iIN5rQqr9da52bbz5Hp/5c+fIpfM/0OyucoZ4gyGDNDutuNsFgjo3bRN++QiXlD/kQ+38vJERvMHRVYaDTQ6b925PMfyySE69mqHG/jF/9MYIWF5E2pJjFR5RjMY9lCEyIRlk8rs6pBiG94bDTeDrow90Wm6jijzKbHogJXRU5weHmz3Z+65hDBdPhcUVcwJR//z+vkICcZSldU5Qn9XUDwzPVPJ1hReFZDYdepCinNK5hbUii79KOM+TjzCMGzcwtMYmay0hAUStZJqDTHpEYC+6RagHlrmN2AumsyWQgnoUz8e64msaCdCwIYqtSy2JmyFJBl2Q=="
+        },
+        "restrictAccess": {
+            "value": 0
+        },
+        "numMembershipNodes": {
+            "value": 1
+        },
+        "mnNodeVMSize": {
+            "value": "Standard_A1"
+        },
+        "mnStorageAccountType": {
+            "value": "Standard_LRS"
+        },
+        "numOrdererNodes": {
+            "value": 1
+        },
+        "onNodeVMSize": {
+            "value": "Standard_A1"
+        },
+        "onStorageAccountType": {
+            "value": "Standard_LRS"
+        },
+        "numPeerNodes": {
+            "value": 2
+        },
+        "pnNodeVMSize": {
+            "value": "Standard_A1"
+        },
+        "pnStorageAccountType": {
+            "value": "Standard_LRS"
+        },
+        "CAUsername": {
+            "value": "admin"
+        },
+        "CAPassword": {
+            "value": "MCu6UOiXDa8D"
+        }
+    }
+}

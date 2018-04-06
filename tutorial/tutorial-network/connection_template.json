@@ -1,0 +1,60 @@
+{
+    "name": "tutorial-network",
+    "x-type": "hlfv1",
+    "version": "1.0.0",
+    "peers": {
+        "{{PEER_PREFIX}}0.{{PEER_ORG_DOMAIN}}": {
+            "url": "grpc://{{PEER_PREFIX}}0:7051",
+            "eventUrl": "grpc://{{PEER_PREFIX}}0:7053"
+        },
+        "{{PEER_PREFIX}}1.{{PEER_ORG_DOMAIN}}": {
+            "url": "grpc://{{PEER_PREFIX}}1:7051",
+            "eventUrl": "grpc://{{PEER_PREFIX}}1:7053"
+        }
+    },
+    "certificateAuthorities": {
+        "{{CA_PREFIX}}0.{{PEER_ORG_DOMAIN}}": {
+            "url": "http://{{CA_PREFIX}}0:7054",
+            "caName": "{{CA_PREFIX}}0.{{PEER_ORG_DOMAIN}}"
+        }
+    },
+    "orderers": {
+        "{{ORDERER_PREFIX}}0.{{ORDERER_ORG_DOMAIN}}": {
+            "url": "grpc://{{ORDERER_PREFIX}}0:7050"
+        }
+    },
+    "organizations": {
+        "Org1": {
+            "mspid": "Org1MSP",
+            "peers": [
+                "{{PEER_PREFIX}}0.{{PEER_ORG_DOMAIN}}"
+            ],
+            "certificateAuthorities": [
+                "{{CA_PREFIX}}0.{{PEER_ORG_DOMAIN}}"
+            ]
+        }
+    },
+    "channels": {
+        "composerchannel": {
+            "orderers": [
+                "{{ORDERER_PREFIX}}0.{{ORDERER_ORG_DOMAIN}}"
+            ],
+            "peers": {
+                "{{PEER_PREFIX}}0.{{PEER_ORG_DOMAIN}}": {}
+            }
+        }
+    },
+    "client": {
+        "organization": "Org1",
+        "connection": {
+            "timeout": {
+                "peer": {
+                    "endorser": "300",
+                    "eventHub": "300",
+                    "eventReg": "300"
+                },
+                "orderer": "300"
+            }
+        }
+    }
+}

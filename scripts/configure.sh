@@ -60,11 +60,37 @@ groupadd docker
 # Add the Azure user to the docker group:
 usermod -aG docker $AZUREUSER
 
+case "${NODE_TYPE}" in
+"ca")
+	# Update package lists
+	apt-add-repository -y ppa:git-core/ppa
+	apt-get update
+
+    # Install Unzip
+	apt-get install unzip
+
+	# Install Git
+	apt-get install -y git
+
+	# Install nvm dependencies
+	apt-get -y install build-essential libssl-dev
+
+	# Install python v2 if required
+	set +e
+	COUNT="$(python -V 2>&1 | grep -c 2.)"
+	if [ ${COUNT} -ne 1 ]
+	then
+   		apt-get install -y python-minimal
+	fi
+    ;;
+esac
+
+
 ################################################
 # System configuration to be performed as root #
 ################################################
 
-curl -sL https://deb.nodesource.com/setup_6.x | bash
+curl -sL https://deb.nodesource.com/setup_8.x | bash
 apt-get -y install nodejs build-essential
 npm install gulp -g
 
