@@ -259,6 +259,7 @@ function install_orderer {
 function install_peer {
     echo "############################################################"
     echo "Installing Peer..."
+    date
 
     # Pull Docker image
     docker pull hyperledger/fabric-peer:${FABRIC_VERSION}
@@ -286,8 +287,8 @@ function install_peer {
     echo ${PEER_PREFIX}${NODE_INDEX}" started"
     if [ ${NODE_INDEX} -eq 0 ]; then
         echo "Creating channel..."
-        echo "# Waiting 5 minutes."
-        sleep 5m
+        echo "# Waiting 10 minutes."
+        sleep 10m
 
         docker run -d --name CLI -v $HOME/crypto-config:/crypto-config \
             -v $HOME/composerchannel.tx:/composerchannel.tx \
