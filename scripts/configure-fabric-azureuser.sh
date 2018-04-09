@@ -54,7 +54,7 @@ function generate_artifacts {
 
     # Retrieve binaries
     curl -qL https://nexus.hyperledger.org/content/repositories/releases/org/hyperledger/fabric/hyperledger-fabric/linux-amd64-1.1.0/hyperledger-fabric-linux-amd64-1.1.0.tar.gz -o hyperledger-fabric-linux-amd64-1.1.0.tar.gz
-    tar -xvf hyperledger-fabric-linux-amd64-1.1.0.tar.gz || unsuccessful_exit "Failed to retrieve binaries" 203
+    tar -xvf hyperledger-fabric-linux-amd64-1.1.0.tar.gz || unsuccessful_exit "Failed to retrieve binaries" 212
 
     # Set up environment
     os_arch=$(echo "$(uname -s)-amd64" | awk '{print tolower($0)}')
@@ -64,19 +64,21 @@ function generate_artifacts {
     sed -e "s/{{PREFIX}}/${AZURE_PREFIX}/g" -e "s/{{PEER_NUM}}/${PEER_NUM}/g" crypto-config_template.yaml > crypto-config.yaml
     sed -e "s/{{PREFIX}}/${AZURE_PREFIX}/g" configtx_template.yaml > configtx.yaml
 
-    if [ ! -d $HOME/crypto-config ]; then # TODO: Do the test for each file
-        # Generate crypto config
-        ./bin/cryptogen generate --config=./crypto-config.yaml || unsuccessful_exit "Failed to generate crypto config" 204;
+    if [ -d $HOME/crypto-config ]; then # TODO: Do the test for each file
+        rm -rf $HOME/crypto-config;
+    fi;
 
-        # Generate genesis block
-        ./bin/configtxgen -profile ComposerOrdererGenesis -outputBlock orderer.block || unsuccessful_exit "Failed to generate orderer genesis block" 205;
+    # Generate crypto config
+    ./bin/cryptogen generate --config=./crypto-config.yaml || unsuccessful_exit "Failed to generate crypto config" 213
 
-        # Generate transaction configuration
-        ./bin/configtxgen -profile ComposerChannel -outputCreateChannelTx composerchannel.tx -channelID composerchannel || unsuccessful_exit "Failed to generate transaction channel" 206;
+    # Generate genesis block
+    ./bin/configtxgen -profile ComposerOrdererGenesis -outputBlock orderer.block || unsuccessful_exit "Failed to generate orderer genesis block" 214
 
-        # Generate anchor peer update for Org1MSP
-        ./bin/configtxgen -profile ComposerChannel -outputAnchorPeersUpdate Org1MSPanchors.tx -channelID composerchannel -asOrg Org1 || unsuccessful_exit "Failed to generate anchor peer update for Org1" 207;
-    fi
+    # Generate transaction configuration
+    ./bin/configtxgen -profile ComposerChannel -outputCreateChannelTx composerchannel.tx -channelID composerchannel || unsuccessful_exit "Failed to generate transaction channel" 215
+
+    # Generate anchor peer update for Org1MSP
+    ./bin/configtxgen -profile ComposerChannel -outputAnchorPeersUpdate Org1MSPanchors.tx -channelID composerchannel -asOrg Org1 || unsuccessful_exit "Failed to generate anchor peer update for Org1" 216
 }
 
 function get_artifacts {
@@ -84,10 +86,10 @@ function get_artifacts {
     echo "Retrieving network artifacts..."
 
     # Copy the artifacts from the first CA host
-    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/configtx.yaml" . || unsuccessful_exit "Failed to retrieve configtx.yaml" 208
-    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/orderer.block" . || unsuccessful_exit "Failed to retrieve orderer.block" 209
-    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/composerchannel.tx" . || unsuccessful_exit "Failed to retrieve composerchannel.tx" 210
-    scp -o StrictHostKeyChecking=no -r "${CA_PREFIX}0:~/crypto-config" .  || unsuccessful_exit "Failed to retrieve crypto-config" 211
+    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/configtx.yaml" . || unsuccessful_exit "Failed to retrieve configtx.yaml" 217
+    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/orderer.block" . || unsuccessful_exit "Failed to retrieve orderer.block" 218
+    scp -o StrictHostKeyChecking=no "${CA_PREFIX}0:~/composerchannel.tx" . || unsuccessful_exit "Failed to retrieve composerchannel.tx" 219
+    scp -o StrictHostKeyChecking=no -r "${CA_PREFIX}0:~/crypto-config" .  || unsuccessful_exit "Failed to retrieve crypto-config" 220
     
     echo "############################################################"
 }
@@ -97,7 +99,7 @@ function distribute_ssh_key {
     echo "Generating ssh key..."
 
     # Generate new ssh key pair
-    ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa || unsuccessful_exit "Failed to generate ssh key" 212
+    rm -f ~/.ssh/id_rsa && ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa || unsuccessful_exit "Failed to generate ssh key" 221
 
     # Authorize new key
     cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
@@ -116,7 +118,7 @@ function get_ssh_key {
 
     # Get the ssh key from the first CA host
     # TODO: loop here waiting for the request to succeed, instead of sequencing via the template dependencies?
-    curl "http://${CA_PREFIX}0:1515/" -o ~/.ssh/id_rsa || unsuccessful_exit "Failed to retrieve ssh key" 201
+    curl "http://${CA_PREFIX}0:1515/" -o ~/.ssh/id_rsa || unsuccessful_exit "Failed to retrieve ssh key" 222
 
     # Fix permissions
     chmod 700 ~/.ssh
@@ -141,7 +143,7 @@ function install_composer {
 
     # Install nodeJS
     echo "# Installing nodeJS"
-    nvm install --lts
+    nvm install --lts || unsuccessful_exit "Failed to install nodejs" 223
 
     # Configure nvm to use version 6.9.5
     nvm use --lts
@@ -165,17 +167,10 @@ function install_composer {
     # https://hyperledger.github.io/composer/latest/installing/development-tools.html
 
     # Install CLI tools
-    npm install -g composer-cli || unsuccessful_exit "Failed to install composer-cli" 200
-    npm install -g composer-rest-server  || unsuccessful_exit "Failed to install composer-rest-server" 201
-    npm install -g generator-hyperledger-composer  || unsuccessful_exit "Failed to install generator-hyperledger-composer" 202
-    npm install -g yo  || unsuccessful_exit "Failed to install yo" 203
-
-    # Install Hyperledger Fabric tools
-    # mkdir ~/fabric-tools && cd ~/fabric-tools
-    # curl -O https://raw.githubusercontent.com/hyperledger/composer-tools/master/packages/fabric-dev-servers/fabric-dev-servers.zip
-    # unzip fabric-dev-servers.zip || unsuccessful_exit "Failed to retrieve binaries" 204
-    # export FABRIC_VERSION=hlfv11
-    # ./downloadFabric.sh
+    npm install -g composer-cli || unsuccessful_exit "Failed to install composer-cli" 224
+    npm install -g composer-rest-server  || unsuccessful_exit "Failed to install composer-rest-server" 225
+    npm install -g generator-hyperledger-composer  || unsuccessful_exit "Failed to install generator-hyperledger-composer" 226
+    npm install -g yo  || unsuccessful_exit "Failed to install yo" 227
 
     echo "############################################################"
 }
@@ -231,7 +226,7 @@ function install_ca {
         -v $HOME/crypto-config/peerOrganizations/${PEER_ORG_DOMAIN}/ca/:/etc/hyperledger/fabric-ca-server-config \
         hyperledger/fabric-ca:${FABRIC_VERSION} \
         fabric-ca-server start --ca.certfile $cacert --ca.keyfile $cakey -b "${CA_USER}":"${CA_PASSWORD}" -d \
-        || unsuccessful_exit "Failed to start CA" 214
+        || unsuccessful_exit "Failed to start CA" 227
 
     echo "############################################################"
 }
@@ -253,7 +248,7 @@ function install_orderer {
         -e ORDERER_GENERAL_LOCALMSPDIR=/etc/hyperledger/msp/orderer/msp \
         -v $HOME/:/etc/hyperledger/configtx \
         -v $HOME/crypto-config/ordererOrganizations/${ORDERER_ORG_DOMAIN}/orderers/${ORDERER_PREFIX}0.${ORDERER_ORG_DOMAIN}/msp:/etc/hyperledger/msp/orderer/msp \
-        hyperledger/fabric-orderer:${FABRIC_VERSION} orderer || unsuccessful_exit "Failed to start orderer" 215
+        hyperledger/fabric-orderer:${FABRIC_VERSION} orderer || unsuccessful_exit "Failed to start orderer" 228
 
     echo "############################################################"
 }
@@ -270,9 +265,6 @@ function install_peer {
     docker pull hyperledger/fabric-ccenv:${FABRIC_VERSION}
 
     # Start Peer
-        #-e CORE_CHAINCODE_LOGGING_LEVEL=DEBUG \
-        #-e CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=composer_default \
-        #-v $HOME/configtx.yaml:/etc/hyperledger/fabric/configtx.yaml \
     docker run --name ${PEER_PREFIX}${NODE_INDEX}.${PEER_ORG_DOMAIN} -d --restart=always -p 7051:7051 -p 7053:7053 \
         -e CORE_LOGGING_LEVEL=debug \
         -e CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock \
@@ -283,7 +275,7 @@ function install_peer {
         -v $HOME/:/etc/hyperledger/configtx \
         -v $HOME/crypto-config/peerOrganizations/${PEER_ORG_DOMAIN}/peers/${PEER_PREFIX}${NODE_INDEX}.${PEER_ORG_DOMAIN}/msp:/etc/hyperledger/peer/msp \
         -v $HOME/crypto-config/peerOrganizations/${PEER_ORG_DOMAIN}/users:/etc/hyperledger/msp/users \
-        hyperledger/fabric-peer:${FABRIC_VERSION} peer node start || unsuccessful_exit "Failed to start peer" 216
+        hyperledger/fabric-peer:${FABRIC_VERSION} peer node start || unsuccessful_exit "Failed to start peer" 229
 
     # Commands to execute on one of the peers
     echo ${PEER_PREFIX}${NODE_INDEX}" started"
@@ -301,19 +293,19 @@ function install_peer {
             export CORE_PEER_LOCALMSPID="Org1MSP"; \
             export CORE_PEER_MSPCONFIGPATH=/crypto-config/peerOrganizations/'${PEER_ORG_DOMAIN}'/users/Admin@'${PEER_ORG_DOMAIN}'/msp; \
             peer channel create -o '${ORDERER_PREFIX}'0:7050 -c composerchannel -f composerchannel.tx' \
-            || unsuccessful_exit "Failed to create channel" 2010;
+            || unsuccessful_exit "Failed to create channel" 230;
         
         docker exec CLI bash -c 'export CORE_PEER_ADDRESS="'${PEER_PREFIX}'0:7051"; \
             export CORE_PEER_LOCALMSPID="Org1MSP"; \
             export CORE_PEER_MSPCONFIGPATH=/crypto-config/peerOrganizations/'${PEER_ORG_DOMAIN}'/users/Admin@'${PEER_ORG_DOMAIN}'/msp; \
             peer channel join -b composerchannel.block' \
-            || unsuccessful_exit "Failed to join channel (${PEER_PREFIX}0)" 2011;
+            || unsuccessful_exit "Failed to join channel (${PEER_PREFIX}0)" 231;
         
         docker exec CLI bash -c 'export CORE_PEER_ADDRESS='${PEER_PREFIX}'1:7051; \
             export CORE_PEER_LOCALMSPID="Org1MSP"; \
             export CORE_PEER_MSPCONFIGPATH=/crypto-config/peerOrganizations/'${PEER_ORG_DOMAIN}'/users/Admin@'${PEER_ORG_DOMAIN}'/msp; \
             peer channel join -b composerchannel.block -o '${ORDERER_PREFIX}'0:7050'\
-            || unsuccessful_exit "Failed to join channel (${PEER_PREFIX}1)" 2011;
+            || unsuccessful_exit "Failed to join channel (${PEER_PREFIX}1)" 232;
     fi
 
     echo "############################################################"
@@ -341,7 +333,7 @@ case "${NODE_TYPE}" in
     install_peer
     ;;
 *)
-	unsuccessful_exit "Invalid node type, exiting." 202
-	exit 202
+	unsuccessful_exit "Invalid node type, exiting." 233
+	exit 233
     ;;
 esac

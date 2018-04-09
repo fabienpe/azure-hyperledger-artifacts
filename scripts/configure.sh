@@ -40,19 +40,22 @@ CONFIG_LOG_FILE_PATH="$HOMEDIR/config.log";
 # Docker installation: https://docs.docker.com/engine/installation/linux/ubuntu/#install-using-the-repository
 
 # Install packages to allow apt to use a repository over HTTPS:
-apt-get -y install apt-transport-https ca-certificates curl software-properties-common 
+apt-get -y install apt-transport-https ca-certificates curl software-properties-common \
+	|| unsuccessful_exit "Unable to install packages that allow apt to use HTTPS" 200
 
 # Add Docker’s official GPG key:
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - \
+	|| unsuccessful_exit "Unable to install Docker's official GPG key" 201
 
 # Set up the stable repository:
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+	|| unsuccessful_exit "Unable to setup Docker repository" 202
 
 # Update the apt package index:
-apt-get update
+apt-get update || unsuccessful_exit "Unable to update apt package index" 203
 
 # Install the latest version of Docker:
-apt-get -y install docker-ce
+apt-get -y install docker-ce || unsuccessful_exit "Unable to install docker" 204
 
 # Create the docker group:
 groupadd docker
@@ -64,23 +67,23 @@ case "${NODE_TYPE}" in
 "ca")
 	# Update package lists
 	apt-add-repository -y ppa:git-core/ppa
-	apt-get update
+	apt-get update || unsuccessful_exit "Unable to update apt package index" 205
 
     # Install Unzip
-	apt-get install unzip
+	apt-get install unzip  || unsuccessful_exit "Unable to install unzip" 206
 
 	# Install Git
-	apt-get install -y git
+	apt-get install -y git || unsuccessful_exit "Unable to install git" 207
 
 	# Install nvm dependencies
-	apt-get -y install build-essential libssl-dev
+	apt-get -y install build-essential libssl-dev || unsuccessful_exit "Unable to install nvm dependencies" 208
 
 	# Install python v2 if required
 	set +e
 	COUNT="$(python -V 2>&1 | grep -c 2.)"
 	if [ ${COUNT} -ne 1 ]
 	then
-   		apt-get install -y python-minimal
+   		apt-get install -y python-minimal || unsuccessful_exit "Unable to install python" 209
 	fi
     ;;
 esac
@@ -91,8 +94,8 @@ esac
 ################################################
 
 curl -sL https://deb.nodesource.com/setup_8.x | bash
-apt-get -y install nodejs build-essential
-npm install gulp -g
+apt-get -y install nodejs build-essential || unsuccessful_exit "Unable to install nodejs" 210
+npm install gulp -g || unsuccessful_exit "Unable to install gulp" 211
 
 #############
 # Get the script for running as Azure user
