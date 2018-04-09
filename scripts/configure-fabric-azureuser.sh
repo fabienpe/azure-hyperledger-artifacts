@@ -64,17 +64,19 @@ function generate_artifacts {
     sed -e "s/{{PREFIX}}/${AZURE_PREFIX}/g" -e "s/{{PEER_NUM}}/${PEER_NUM}/g" crypto-config_template.yaml > crypto-config.yaml
     sed -e "s/{{PREFIX}}/${AZURE_PREFIX}/g" configtx_template.yaml > configtx.yaml
 
-    # Generate crypto config
-    ./bin/cryptogen generate --config=./crypto-config.yaml || unsuccessful_exit "Failed to generate crypto config" 204
+    if [ ! -d $HOME/crypto-config ]; then # TODO: Do the test for each file
+        # Generate crypto config
+        ./bin/cryptogen generate --config=./crypto-config.yaml || unsuccessful_exit "Failed to generate crypto config" 204;
 
-    # Generate genesis block
-    ./bin/configtxgen -profile ComposerOrdererGenesis -outputBlock orderer.block || unsuccessful_exit "Failed to generate orderer genesis block" 205
+        # Generate genesis block
+        ./bin/configtxgen -profile ComposerOrdererGenesis -outputBlock orderer.block || unsuccessful_exit "Failed to generate orderer genesis block" 205;
 
-    # Generate transaction configuration
-    ./bin/configtxgen -profile ComposerChannel -outputCreateChannelTx composerchannel.tx -channelID composerchannel || unsuccessful_exit "Failed to generate transaction channel" 206
+        # Generate transaction configuration
+        ./bin/configtxgen -profile ComposerChannel -outputCreateChannelTx composerchannel.tx -channelID composerchannel || unsuccessful_exit "Failed to generate transaction channel" 206;
 
-    # Generate anchor peer update for Org1MSP
-    ./bin/configtxgen -profile ComposerChannel -outputAnchorPeersUpdate Org1MSPanchors.tx -channelID composerchannel -asOrg Org1 || unsuccessful_exit "Failed to generate anchor peer update for Org1" 207
+        # Generate anchor peer update for Org1MSP
+        ./bin/configtxgen -profile ComposerChannel -outputAnchorPeersUpdate Org1MSPanchors.tx -channelID composerchannel -asOrg Org1 || unsuccessful_exit "Failed to generate anchor peer update for Org1" 207;
+    fi
 }
 
 function get_artifacts {
